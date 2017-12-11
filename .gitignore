@@ -2,3 +2,5 @@
 *.pyc
 *.pkl
 *DS_Store
+/dataset/office31/*
+__pycache__/
