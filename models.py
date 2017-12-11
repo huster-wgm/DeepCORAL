@@ -1,3 +1,13 @@
+# @Author: cc
+# @Date:   2017-12-02T12:41:34+09:00
+# @Email:  guangmingwu2010@gmail.com
+# @Filename: models.py
+# @Last modified by:   cc
+# @Last modified time: 2017-12-11T15:31:58+09:00
+# @License: MIT
+
+
+
 import torch
 import torch.nn as nn
 from torch.autograd import Function, Variable
@@ -36,7 +46,7 @@ class CORAL(Function):
         res = forbenius_norm(cs - ct)**2/(4*d*d)
         res = torch.FloatTensor([res])
 
-        return res if CUDA is False else res.cuda()
+        return res.cuda() if CUDA else res
 
     def backward(self, grad_output):
         source, target, cs, ct, ns, nt, d = self.saved
@@ -58,19 +68,23 @@ class DeepCORAL(nn.Module):
         super(DeepCORAL, self).__init__()
         self.sharedNet = AlexNet()
         self.source_fc = nn.Linear(4096, num_classes)
+        self.source_softmax = nn.Softmax()
         self.target_fc = nn.Linear(4096, num_classes)
+        self.target_softmax = nn.Softmax()
 
         # initialize according to CORAL paper experiment
         self.source_fc.weight.data.normal_(0, 0.005)
         self.target_fc.weight.data.normal_(0, 0.005)
 
     def forward(self, source, target):
-        source = self.sharedNet(source)
-        source = self.source_fc(source)
+        source_f = self.sharedNet(source)
+        source_p = self.source_fc(source_f)
+        source_p = self.source_softmax(source_p)
 
-        target = self.sharedNet(target)
-        target = self.source_fc(target)
-        return source, target
+        target_f = self.sharedNet(target)
+        target_p = self.source_fc(target_f)
+        target_p = self.target_softmax(target_p)
+        return [source_f, source_p], [target_f, target_p]
 
 
 class AlexNet(nn.Module):
@@ -99,6 +113,7 @@ class AlexNet(nn.Module):
             nn.Linear(4096, 4096),
             nn.ReLU(inplace=True),
             # nn.Linear(4096, num_classes),
+            # nn.Softmax(inplace=True),
         )
 
     def forward(self, x):
