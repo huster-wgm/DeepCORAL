@@ -3,7 +3,7 @@
 # @Email:  guangmingwu2010@gmail.com
 # @Filename: main.py
 # @Last modified by:   cc
-# @Last modified time: 2017-12-11T15:28:45+09:00
+# @Last modified time: 2017-12-13T23:09:09+09:00
 # @License: MIT
 
 
@@ -23,7 +23,7 @@ CUDA = True if torch.cuda.is_available() else False
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 5e-4
 MOMENTUM = 0.9
-BATCH_SIZE = [200, 56]
+BATCH_SIZE = [32, 32]
 EPOCHS = 100
 
 
@@ -101,10 +101,10 @@ def test(model, dataset_loader, e, mode='source'):
         out = out1 if mode == 'source' else out2
 
         # sum up batch loss
-        test_loss += torch.nn.functional.cross_entropy(out, target, size_average=False).data[0]
+        test_loss += torch.nn.functional.cross_entropy(out[1], target, size_average=False).data[0]
 
         # get the index of the max log-probability
-        pred = out.data.max(1, keepdim=True)[1]
+        pred = out[1].data.max(1, keepdim=True)[1]
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
     test_loss /= len(dataset_loader.dataset)

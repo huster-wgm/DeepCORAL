@@ -3,7 +3,7 @@
 # @Email:  guangmingwu2010@gmail.com
 # @Filename: models.py
 # @Last modified by:   cc
-# @Last modified time: 2017-12-11T15:31:58+09:00
+# @Last modified time: 2017-12-13T23:06:21+09:00
 # @License: MIT
 
 
@@ -25,8 +25,8 @@ def feature_covariance_mat(n, d):
     return covariance_mat
 
 
-def forbenius_norm(mat):
-    return (mat**2).sum()**0.5
+def forbenius_norm(mat, d):
+    return (mat**2).sum()/(4*d*d)
 
 
 '''
@@ -43,7 +43,7 @@ class CORAL(Function):
 
         self.saved = (source, target, cs, ct, ns, nt, d)
 
-        res = forbenius_norm(cs - ct)**2/(4*d*d)
+        res = forbenius_norm(cs - ct, d)
         res = torch.FloatTensor([res])
 
         return res.cuda() if CUDA else res
@@ -112,8 +112,6 @@ class AlexNet(nn.Module):
             nn.Dropout(),
             nn.Linear(4096, 4096),
             nn.ReLU(inplace=True),
-            # nn.Linear(4096, num_classes),
-            # nn.Softmax(inplace=True),
         )
 
     def forward(self, x):
