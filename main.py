@@ -91,16 +91,16 @@ def train(model, optimizer, epoch, _lambda):
             'total_loss': sum_loss.data[0]
         })
 
-        print('Train Epoch: {:2d} [{:2d}/{:2d}]\t'
-              'Lambda: {:.4f}, Class: {:.6f}, CORAL: {:.6f}, Total_Loss: {:.6f}'.format(
-                  epoch,
-                  batch_idx + 1,
-                  train_steps,
-                  _lambda,
-                  classification_loss.data[0],
-                  coral_loss.data[0],
-                  sum_loss.data[0]
-              ))
+        # print('Train Epoch: {:2d} [{:2d}/{:2d}]\t'
+        #       'Lambda: {:.4f}, Class: {:.6f}, CORAL: {:.6f}, Total_Loss: {:.6f}'.format(
+        #           epoch,
+        #           batch_idx + 1,
+        #           train_steps,
+        #           _lambda,
+        #           classification_loss.data[0],
+        #           coral_loss.data[0],
+        #           sum_loss.data[0]
+        #       ))
 
     return result
 
