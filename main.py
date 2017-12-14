@@ -3,7 +3,7 @@
 # @Email:  guangmingwu2010@gmail.com
 # @Filename: main.py
 # @Last modified by:   cc
-# @Last modified time: 2017-12-13T23:09:09+09:00
+# @Last modified time: 2017-12-14T18:10:50+09:00
 # @License: MIT
 
 
@@ -56,8 +56,8 @@ def train(model, optimizer, epoch, _lambda):
 
         classification_loss = torch.nn.functional.cross_entropy(source_outs[1], source_label)
         coral = models.CORAL()
-        coral_loss = coral(source_outs[0], target_outs[0])
-
+        # coral_loss = coral(source_outs[0], target_outs[0])
+        coral_loss = torch.mean(torch.sum((source_outs[0]-target_outs[0])**2))/BATCH_SIZE[0]
         sum_loss = _lambda*coral_loss + classification_loss
         sum_loss.backward()
 
