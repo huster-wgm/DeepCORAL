@@ -3,7 +3,7 @@
 # @Email:  guangmingwu2010@gmail.com
 # @Filename: main.py
 # @Last modified by:   cc
-# @Last modified time: 2017-12-14T18:10:50+09:00
+# @Last modified time: 2017-12-14T23:10:21+09:00
 # @License: MIT
 
 
@@ -30,6 +30,25 @@ EPOCHS = 100
 source_loader = get_office31_dataloader(case='amazon', batch_size=BATCH_SIZE[0])
 target_loader = get_office31_dataloader(case='webcam', batch_size=BATCH_SIZE[1])
 
+def CORAL(target, source):
+    # input must be Variable
+    # return coral loss of target and source
+    dim = target.data.shape[1]
+    nb_t = target.data.shape[0]
+    nb_s = source.data.shape[0]
+    ones_t = torch.ones(nb_t).view(1, -1)
+    ones_s = torch.ones(nb_s).view(1, -1)
+    if CUDA:
+        ones_t = ones_t.cuda()
+        ones_s = ones_s.cuda()
+    ones_t = Variable(ones_t, requires_grad=False)
+    ones_s = Variable(ones_s, requires_grad=False)
+    tmp_t = ones_t.matmul(target)
+    tmp_s = ones_s.matmul(source)
+    cov_t = (target.t().matmul(target) - (tmp_t.t().matmul(tmp_t) / nb_t)) / (nb_t - 1)
+    cov_s = (source.t().matmul(source) - (tmp_s.t().matmul(tmp_s) / nb_s)) / (nb_s - 1)
+    coral = ((cov_t-cov_s)**2).sum()/(4*dim*dim)
+    return coral
 
 def train(model, optimizer, epoch, _lambda):
     model.train()
@@ -55,9 +74,8 @@ def train(model, optimizer, epoch, _lambda):
         source_outs, target_outs = model(source_data, target_data)
 
         classification_loss = torch.nn.functional.cross_entropy(source_outs[1], source_label)
-        coral = models.CORAL()
         # coral_loss = coral(source_outs[0], target_outs[0])
-        coral_loss = torch.mean(torch.sum((source_outs[0]-target_outs[0])**2))/BATCH_SIZE[0]
+        coral_loss = CORAL(source_outs[0], target_outs[0])
         sum_loss = _lambda*coral_loss + classification_loss
         sum_loss.backward()
 

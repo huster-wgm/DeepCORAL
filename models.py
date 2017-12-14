@@ -3,7 +3,7 @@
 # @Email:  guangmingwu2010@gmail.com
 # @Filename: models.py
 # @Last modified by:   cc
-# @Last modified time: 2017-12-13T23:06:21+09:00
+# @Last modified time: 2017-12-14T22:48:20+09:00
 # @License: MIT
 
 
@@ -19,7 +19,7 @@ def feature_covariance_mat(n, d):
     ones_t = torch.ones(n).view(1, -1)
     if CUDA:
         ones_t = ones_t.cuda()
-
+    ones_t = Variable(ones_t, require_grad=False)
     tmp = ones_t.matmul(d)
     covariance_mat = (d.t().matmul(d) - (tmp.t().matmul(tmp) / n)) / (n - 1)
     return covariance_mat
