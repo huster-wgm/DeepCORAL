@@ -16,6 +16,8 @@ from torch.autograd import Variable
 
 import models
 import utils
+import pandas as pd
+import matplotlib.pyplot as plt
 from data_loader import get_train_test_loader, get_office31_dataloader
 
 
@@ -23,12 +25,13 @@ CUDA = True if torch.cuda.is_available() else False
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 5e-4
 MOMENTUM = 0.9
-BATCH_SIZE = [32, 32]
-EPOCHS = 100
+BATCH_SIZE = [200, 56]
+EPOCHS = 50
 
 
 source_loader = get_office31_dataloader(case='amazon', batch_size=BATCH_SIZE[0])
 target_loader = get_office31_dataloader(case='webcam', batch_size=BATCH_SIZE[1])
+
 
 def CORAL(target, source):
     # input must be Variable
@@ -75,7 +78,7 @@ def train(model, optimizer, epoch, _lambda):
 
         classification_loss = torch.nn.functional.cross_entropy(source_outs[1], source_label)
         # coral_loss = coral(source_outs[0], target_outs[0])
-        coral_loss = CORAL(source_outs[0], target_outs[0])
+        coral_loss = CORAL(source_outs[1], target_outs[1])
         sum_loss = _lambda*coral_loss + classification_loss
         sum_loss.backward()
 
@@ -156,62 +159,73 @@ if __name__ == '__main__':
     parser.add_argument('--load', help='Resume from checkpoint file')
     args = parser.parse_args()
 
-    model = models.DeepCORAL(31)
+    for with_coral in [False, True]:
+        model = models.DeepCORAL(31)
+        # support different learning rate according to CORAL paper
+        # i.e. 10 times learning rate for the last two fc layers.
+        optimizer = torch.optim.SGD([
+            {'params': model.sharedNet.parameters()},
+            {'params': model.fc.parameters(), 'lr': 10*LEARNING_RATE},
+        ], lr=LEARNING_RATE, momentum=MOMENTUM)
+    
+        if CUDA:
+            model = model.cuda()
 
-    # support different learning rate according to CORAL paper
-    # i.e. 10 times learning rate for the last two fc layers.
-    optimizer = torch.optim.SGD([
-        {'params': model.sharedNet.parameters()},
-        {'params': model.source_fc.parameters(), 'lr': 10*LEARNING_RATE},
-        {'params': model.target_fc.parameters(), 'lr': 10*LEARNING_RATE}
-    ], lr=LEARNING_RATE, momentum=MOMENTUM)
-
-    if CUDA:
-        model = model.cuda()
-
-    if args.load is not None:
-        utils.load_net(model, args.load)
-    else:
         load_pretrained(model.sharedNet)
+        training_statistic = []
+        testing_s_statistic = []
+        testing_t_statistic = []
+        for e in range(0, EPOCHS):
+            if not with_coral:
+                _lambda = 0
+            else:
+                _lambda = 1
+            res = train(model, optimizer, e+1, _lambda)
+            print('###EPOCH {}: Class: {:.6f}, CORAL: {:.6f}, Total_Loss: {:.6f}'.format(
+                e+1,
+                sum(row['classification_loss'] / row['total_steps'] for row in res),
+                sum(row['coral_loss'] / row['total_steps'] for row in res),
+                sum(row['total_loss'] / row['total_steps'] for row in res),
+            ))
+    
+            training_statistic.append(res)
+    
+            test_source = test(model, source_loader, e)
+            test_target = test(model, target_loader, e, mode='target')
+            testing_s_statistic.append(test_source)
+            testing_t_statistic.append(test_target)
+    
+            print('###Test Source: Epoch: {}, avg_loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
+                e+1,
+                test_source['average_loss'],
+                test_source['correct'],
+                test_source['total'],
+                test_source['accuracy'],
+            ))
+            print('###Test Target: Epoch: {}, avg_loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
+                e+1,
+                test_target['average_loss'],
+                test_target['correct'],
+                test_target['total'],
+                test_target['accuracy'],
+            ))
+    
+        test_s_records = pd.DataFrame(testing_s_statistic)
+        test_t_records = pd.DataFrame(testing_t_statistic)
+        test_s_records.to_csv("source_{0}.csv".format("with_coral" if with_coral else "without_coral"), index=False)
+        test_t_records.to_csv("target_{0}.csv".format("with_coral" if with_coral else "without_coral"), index=False)
 
-    training_statistic = []
-    testing_s_statistic = []
-    testing_t_statistic = []
+    s_with = pd.read_csv("source_with_coral.csv")
+    s_without = pd.read_csv("source_without_coral.csv")
+    t_with = pd.read_csv("target_with_coral.csv")
+    t_without = pd.read_csv("target_without_coral.csv")
 
-    for e in range(0, EPOCHS):
-        _lambda = (e+1)/EPOCHS
-        # _lambda = 0.0
-        res = train(model, optimizer, e+1, _lambda)
-        print('###EPOCH {}: Class: {:.6f}, CORAL: {:.6f}, Total_Loss: {:.6f}'.format(
-            e+1,
-            sum(row['classification_loss'] / row['total_steps'] for row in res),
-            sum(row['coral_loss'] / row['total_steps'] for row in res),
-            sum(row['total_loss'] / row['total_steps'] for row in res),
-        ))
-
-        training_statistic.append(res)
-
-        test_source = test(model, source_loader, e)
-        test_target = test(model, target_loader, e, mode='target')
-        testing_s_statistic.append(test_source)
-        testing_t_statistic.append(test_target)
-
-        print('###Test Source: Epoch: {}, avg_loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
-            e+1,
-            test_source['average_loss'],
-            test_source['correct'],
-            test_source['total'],
-            test_source['accuracy'],
-        ))
-        print('###Test Target: Epoch: {}, avg_loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
-            e+1,
-            test_target['average_loss'],
-            test_target['correct'],
-            test_target['total'],
-            test_target['accuracy'],
-        ))
-
-    utils.save(training_statistic, 'training_statistic.pkl')
-    utils.save(testing_s_statistic, 'testing_s_statistic.pkl')
-    utils.save(testing_t_statistic, 'testing_t_statistic.pkl')
-    utils.save_net(model, 'checkpoint.tar')
+    plt.figure()
+    plt.plot(s_with["epoch"], s_with["accuracy"], "r")
+    plt.plot(s_without["epoch"], s_without["accuracy"], "b")
+    plt.plot(t_with["epoch"], t_with["accuracy"], "g")
+    plt.plot(t_without["epoch"], t_without["accuracy"], "y")
+    plt.legend(["source acc, w/ coral","source acc, w/o coral","target acc, w/ coral","target acc, w/o coral"])
+    plt.xlabel("Number of EPOCHS")
+    plt.ylabel("Accuracy")
+    plt.show()

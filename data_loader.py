@@ -74,11 +74,12 @@ def get_office31_dataloader(case, batch_size):
         'dslr': [],
         'imagenet': [0.229, 0.224, 0.225]
     }
-
-    img_size = (227, 227)
+    ori_size = (256, 256)
+    img_size = (224, 224)
 
     transform = [
-        transforms.Scale(img_size),
+        transforms.Resize(ori_size),
+        transforms.RandomCrop(img_size),
         transforms.ToTensor(),
         transforms.Normalize(means['imagenet'], stds['imagenet']),
     ]
